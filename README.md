@@ -1,5 +1,7 @@
 # Steward
 
+![Steward](cover.png)
+
 An autonomous operations engine with a human approval gate. It runs unattended,
 survives restarts, and is built so that a consequential action, such as sending
 an email or creating an invoice, is never performed twice.
