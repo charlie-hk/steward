@@ -1,0 +1,29 @@
+{
+  "name": "steward",
+  "version": "0.1.0",
+  "description": "An autonomous operations engine with a human approval gate. Runs unattended, survives restarts, and never performs a consequential action twice.",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "node --test",
+    "demo": "node scripts/demo.js"
+  },
+  "keywords": [
+    "job-queue",
+    "idempotency",
+    "workflow",
+    "automation",
+    "reliability",
+    "sqlite",
+    "human-in-the-loop",
+    "nodejs"
+  ],
+  "author": "Ali Amini",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  }
+}

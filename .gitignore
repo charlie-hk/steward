@@ -1,0 +1,13 @@
+node_modules/
+npm-debug.log*
+
+# Local database files
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# Env and editor
+.env
+.vscode/
+.DS_Store
