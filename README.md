@@ -40,8 +40,47 @@ Planned, built in stages:
 
 - A human approval gate for consequential actions.
 - An approval dashboard (pending / approved / rejected / failed / completed).
-- A thin, swappable AI adapter for drafting content, defaulting to a mock.
 - More mock connectors (CRM, invoicing).
+- The AI layer described below.
+
+## The AI layer
+
+An automation like this is more useful when a step can draft something, for
+example a reply to a customer email, and leave the decision to a human. The
+model never acts on its own; it proposes, the approval gate holds the proposal,
+and a person approves or rejects it.
+
+The intelligence is added in four stages, from the simplest and most honest to
+the most involved. Each one is a real, well-understood technique, not a claim
+to have built a model from scratch. Training a base language model is the work
+of a large research team and is out of scope here; Steward uses a model, it
+does not try to be one.
+
+1. **Use a model.** A drafting step calls a model API (OpenAI, Anthropic, or a
+   local model) behind a thin adapter. The default adapter is a mock that
+   returns a fixed draft, so the system runs and is testable with no API key.
+   The model is used, not changed.
+
+2. **Give it memory (retrieval).** Before drafting, the step retrieves relevant
+   past context, approved replies, account history, documents, and passes it to
+   the model. The model stays fixed; the system behaves as if it has learned
+   because its answers are grounded in your own data.
+
+3. **Learn from approvals (feedback loop).** Every approval and rejection is
+   already recorded by the approval gate. That log becomes training signal:
+   the drafting step is shown previously approved examples so new drafts move
+   toward what a human has accepted before. This is learning at the level of
+   examples and memory, built on data the system already keeps.
+
+4. **Fine-tune (optional).** When there is enough approved history, a base
+   model can be lightly fine-tuned on it to match a house tone or format.
+   This actually adjusts the model, but only its style, and in practice stages
+   2 and 3 cover most needs more cheaply.
+
+The through-line: Steward never pretends to think on its own. It acts
+autonomously, keeps a record of every human decision, and uses that record to
+get better. Stages 1 and 2 are the near-term targets; 3 and 4 build on the
+approval history the gate produces.
 
 ## The guarantee, and the test that proves it
 
