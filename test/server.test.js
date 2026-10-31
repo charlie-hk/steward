@@ -96,3 +96,32 @@ test('the dashboard page itself is served', async () => {
     assert.match(await res.text(), /Steward/);
   });
 });
+
+test('the scenarios are listed and can be run over HTTP', async () => {
+  await withServer(async ({ base, worker, get }) => {
+    const list = await get('/api/scenarios');
+    assert.ok(list.length >= 5);
+    assert.ok(list.every((s) => s.key && s.title && s.expect));
+
+    const res = await post(base, '/api/scenarios/payment', {});
+    assert.equal(res.status, 200);
+    await worker.drain();
+
+    const waiting = await get('/api/approvals');
+    assert.equal(waiting.length, 1);
+    assert.equal(waiting[0].type, 'payment.send');
+    assert.equal(waiting[0].payload.amount, 4820);
+
+    const missing = await post(base, '/api/scenarios/nope', {});
+    assert.equal(missing.status, 404);
+  });
+});
+
+test('the crash scenario leaves one invoice, not two', async () => {
+  await withServer(async ({ base, worker, connectors }) => {
+    const res = await post(base, '/api/scenarios/crash', {});
+    assert.equal(res.status, 200);
+    await worker.drain();
+    assert.equal(connectors.invoicing.count(), 1);
+  });
+});

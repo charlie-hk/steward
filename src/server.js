@@ -1,5 +1,6 @@
 const path = require('path');
 const express = require('express');
+const { scenarios, byKey } = require('./scenarios');
 
 // The dashboard's API.
 //
@@ -8,7 +9,11 @@ const express = require('express');
 // worth arguing about is 409: pressing Approve on something already decided is
 // not an error in the server, it is the server telling you that somebody got
 // there first. The UI shows that rather than silently reloading.
-function createServer({ db, queue, gate, staticDir = path.join(__dirname, '..', 'public') }) {
+// The built panel in ../docs is what the service serves and what GitHub Pages
+// serves. One frontend, not two that drift.
+const BUILT_PANEL = path.join(__dirname, '..', 'docs');
+
+function createServer({ db, queue, gate, worker, connectors, staticDir = BUILT_PANEL }) {
   const app = express();
   app.use(express.json());
 
@@ -59,6 +64,23 @@ function createServer({ db, queue, gate, staticDir = path.join(__dirname, '..', 
       res.json({ ok: true, approval: result.approval });
     });
   }
+
+  // The demo situations, so the browser build and a running service offer the
+  // same buttons and the same outcomes.
+  app.get('/api/scenarios', (req, res) => {
+    res.json(scenarios.map(({ key, title, blurb, expect }) => ({ key, title, blurb, expect })));
+  });
+
+  app.post('/api/scenarios/:key', async (req, res) => {
+    const scenario = byKey[req.params.key];
+    if (!scenario) return res.status(404).json({ error: `no scenario "${req.params.key}"` });
+    try {
+      const result = await scenario.run({ db, queue, gate, worker, connectors });
+      res.json({ ok: true, scenario: scenario.key, result: result ?? null });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   app.use(express.static(staticDir));
   return app;

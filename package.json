@@ -8,7 +8,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "test": "node --test",
+    "test": "node --test \"test/*.test.js\"",
     "demo": "node scripts/demo.js",
     "demo:gate": "node scripts/demo-gate.js",
     "review": "node scripts/review.js",
@@ -16,7 +16,9 @@
     "work": "node src/cli.js work",
     "demo:ai": "node scripts/demo-ai.js",
     "export:training": "node scripts/export-training.js",
-    "figures": "node scripts/figures.js"
+    "figures": "node scripts/figures.js",
+    "test:web": "npm --prefix web test",
+    "build:web": "npm --prefix web run build"
   },
   "keywords": [
     "job-queue",

@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-ink-800 text-slate-200 antialiased;
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+}
+
+@layer components {
+  .card { @apply bg-ink-700/70 border border-edge/80 rounded-xl; }
+  .label { @apply text-[11px] uppercase tracking-wider text-slate-500 font-semibold; }
+  .field {
+    @apply bg-ink-900 border border-edge rounded-lg px-3 py-2 text-sm text-slate-200
+           placeholder:text-slate-600 focus:outline-none focus:border-info/70 w-full;
+  }
+  .btn { @apply rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50; }
+  .btn-approve { @apply btn bg-[#238636] text-white hover:bg-[#2ea043]; }
+  .btn-reject { @apply btn border border-edge text-slate-400 hover:text-slate-200 hover:border-slate-500; }
+  .btn-ghost { @apply btn border border-edge text-slate-300 hover:border-slate-500 hover:bg-ink-600; }
+}

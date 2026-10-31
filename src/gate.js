@@ -19,12 +19,19 @@ const DAY = 24 * 60 * 60 * 1000;
 // person has already approved, which is the behaviour anyone reviewing an
 // audit log expects.
 class Gate {
-  constructor(db, queue, { policy = makePolicy(), ttlMs = DAY, notifier = silent() } = {}) {
+  constructor(db, queue, { policy = makePolicy(), ttlMs = DAY, ttlByType = {}, notifier = silent() } = {}) {
     this.db = db;
     this.queue = queue;
     this.policy = policy;
     this.ttlMs = ttlMs;
+    // Not every decision deserves the same window. A reply can sit for a day;
+    // something time-critical should expire while it still matters.
+    this.ttlByType = ttlByType;
     this.notifier = notifier;
+  }
+
+  ttlFor(type) {
+    return this.ttlByType[type] ?? this.ttlMs;
   }
 
   check(job, payload = {}) {
@@ -45,7 +52,7 @@ class Gate {
     const info = this.db.prepare(`
       INSERT OR IGNORE INTO approvals (job_id, reason, status, requested_at, expires_at)
       VALUES (?, ?, 'pending', ?, ?)
-    `).run(job.id, reason, t, t + this.ttlMs);
+    `).run(job.id, reason, t, t + this.ttlFor(job.type));
     const approval = this.findByJob(job.id);
     // Only on the row that was actually created. A job claimed, held and
     // claimed again must not alert anyone a second time, and a notifier that

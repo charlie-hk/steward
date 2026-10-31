@@ -116,4 +116,7 @@ function migrate(db) {
   if (!columns.includes('kind')) db.exec("ALTER TABLE sent_emails ADD COLUMN kind TEXT NOT NULL DEFAULT 'mail'");
 }
 
-module.exports = { openDb };
+// migrate is exported on its own because the schema is not tied to Node: the
+// browser build runs the same statements against SQLite compiled to
+// WebAssembly, so the demo and the service cannot drift apart.
+module.exports = { openDb, migrate };

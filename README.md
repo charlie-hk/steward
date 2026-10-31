@@ -13,13 +13,16 @@ replaceable part. The hard part is an always-on worker that does the right
 thing after a crash, and that knows which of its own actions it is not allowed
 to take alone.
 
-![Node](https://img.shields.io/badge/node-18%2B-brightgreen) ![SQLite](https://img.shields.io/badge/storage-sqlite-003b57) ![Express](https://img.shields.io/badge/http-express-black) ![tests](https://img.shields.io/badge/tests-32%20passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-lightgrey)
+![Node](https://img.shields.io/badge/node-18%2B-brightgreen) ![SQLite](https://img.shields.io/badge/storage-sqlite-003b57) ![Express](https://img.shields.io/badge/http-express-black) ![React](https://img.shields.io/badge/panel-react%2018-61dafb) ![tests](https://img.shields.io/badge/tests-44%20passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-lightgrey)
+
+**[Open the panel](https://charlie-hk.github.io/steward/)** - the real engine,
+running in your browser. Press a scenario and decide what it holds.
 
 ```bash
 npm install
-npm test            # 32 passing
+npm test            # 35 passing
 npm run demo:ai     # retrieve, draft, hold, decide, learn
-npm start           # the worker and the dashboard on http://localhost:3000
+npm start           # the worker and the panel on http://localhost:3000
 ```
 
 ## The problem it solves
@@ -86,14 +89,32 @@ notifier (`src/notify.js`) and calls it exactly once per request. Console and
 an idempotent mock email are included; a notifier that throws is logged and
 never fails the job.
 
-## The dashboard
+## The panel
 
-![The dashboard](docs/dashboard.png)
+[![The panel](media/panel.png)](https://charlie-hk.github.io/steward/)
 
-`npm start` runs the worker and serves the dashboard on port 3000. It shows
-what is waiting with the reason, the draft text when a model wrote one, every
-job's state, and the audit log. Approve and Reject take a note, and the note
-goes into the log with the name of whoever decided.
+`npm start` runs the worker and serves the panel on port 3000. It shows what is
+waiting and why, the draft text when a model wrote one, the policy, every job's
+state and the audit log. Approve and Reject take a note, and the note goes into
+the log with the name of whoever decided.
+
+The same build is published at
+**[charlie-hk.github.io/steward](https://charlie-hk.github.io/steward/)**, and
+that page has no server behind it. It is not a mock either: the panel imports
+the real queue, gate, policy and drafting step from `src/`, and swaps only the
+database for SQLite compiled to WebAssembly. A rule change changes the demo
+with it. The scenarios on the page are the same ones the API exposes, defined
+once in `src/scenarios.js`:
+
+| | what it shows |
+|---|---|
+| Ordinary work | no rule matches, so nobody is asked |
+| A payment | held, because it moves money |
+| An invoice over the limit | one issued, one held, same job type |
+| A reply written by the model | retrieval, a draft, and a model that cannot send |
+| A crash mid-job | the lease expires, another worker finishes it, one invoice exists |
+| Something that keeps failing | retry with backoff, then a terminal failure, no human asked |
+| An approval nobody answers | it expires and the job stops |
 
 The API underneath is deliberately thin, because every rule lives in the gate:
 
@@ -101,6 +122,7 @@ The API underneath is deliberately thin, because every rule lives in the gate:
 GET  /api/summary                  counts
 GET  /api/approvals                what is waiting, with its draft
 GET  /api/jobs   GET /api/audit
+GET  /api/scenarios                POST /api/scenarios/:key to run one
 POST /api/approvals/:id/approve    { by, note }   409 if already decided
 POST /api/approvals/:id/reject     { by, note }
 ```
@@ -198,11 +220,14 @@ restarts, and prints what it ended up with.
 
 ```bash
 npm install
-npm test                  # 32 passing
+npm test                  # 35 passing
+npm --prefix web install
+npm run test:web          # 9 more, including the engine on WebAssembly SQLite
+npm run build:web         # type check and build the panel into docs/
 npm run demo              # the durable queue, end to end
 npm run demo:gate         # the approval gate, end to end
 npm run demo:ai           # retrieval, drafting, approval, learning
-npm start                 # worker + dashboard, http://localhost:3000
+npm start                 # worker + panel, http://localhost:3000
 npm start -- --db data/ai-demo.db    # or point it at a demo database
 ```
 
@@ -227,8 +252,10 @@ src/
     examples.js       approved drafts as examples, rejections as warnings
     draft.js          the drafting and sending handlers
     training.js       the fine-tuning export
+  scenarios.js        the demo situations, shared by the API and the panel
   connectors/         email, crm, invoicing - all idempotent mocks
-public/index.html     the dashboard
+web/                  the React panel, and the engine running in a browser
+docs/                 the built panel, served by GitHub Pages and by the service
 test/                 queue, approvals, connectors, notify, runner, ai, server
 scripts/              demo, demo-gate, demo-ai, review, export-training, figures
 ```
@@ -245,7 +272,9 @@ not the same claim.
 | Connectors: email, CRM, invoicing | **verified** | 3 tests, idempotency on each |
 | Notifier: fires once, survives a failing channel | **verified** | 3 tests |
 | Long-running service and graceful shutdown | **verified** | 3 tests, including that stopping waits for the job in flight |
-| Dashboard API, including 409 on a second decision | **verified** | 5 tests against a real listening server over HTTP |
+| Dashboard API, including 409 on a second decision | **verified** | 7 tests against a real listening server over HTTP |
+| The engine running on WebAssembly SQLite in a browser | **verified** | 5 tests in `web/`: the adapter, a rollback, hold and approve, a crash mid-job, and idempotency |
+| The panel itself | **verified** | 4 component tests, plus a headless browser run of the published build: scenarios, a decision, and the counts moving |
 | Retrieval, drafting, learning from approvals, training export | **verified with the mock model** | 6 tests |
 | A real model provider | **implemented, not run** | No API key in the test environment. The adapter is 20 lines against the standard chat completion shape. |
 | Fine-tuning | **export only** | The JSONL is built and tested. No fine-tune has been run. |

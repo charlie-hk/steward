@@ -155,3 +155,20 @@ test('a rule change does not re-open a job a person already approved', async () 
   await worker.drain();
   assert.equal(handler.calls.length, 1);
 });
+
+test('a type can be given a shorter window than the default', async () => {
+  const db = openDb(':memory:');
+  const queue = new Queue(db);
+  const gate = new Gate(db, queue, { ttlMs: 60_000, ttlByType: { 'payment.send': 20 } });
+  const worker = new Worker(db, queue, { 'payment.send': async () => {}, 'contract.sign': async () => {} }, { gate });
+
+  const quick = queue.enqueue({ type: 'payment.send', payload: { amount: 10 } });
+  const slow = queue.enqueue({ type: 'contract.sign', payload: {} });
+  await worker.drain();
+
+  await new Promise((r) => setTimeout(r, 40));
+  await worker.drain();
+
+  assert.equal(queue.get(quick.id).status, 'expired');
+  assert.equal(queue.get(slow.id).status, 'awaiting_approval');
+});

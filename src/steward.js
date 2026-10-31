@@ -21,6 +21,7 @@ function createSteward({
   quiet = false,
   pollMs = 500,
   ttlMs,
+  ttlByType = { 'contract.sign': 10000 },
 } = {}) {
   const db = openDb(dbFile);
   const queue = new Queue(db);
@@ -34,7 +35,7 @@ function createSteward({
     emailNotifier(email, alertTo),
   ]);
 
-  const gate = new Gate(db, queue, { policy, notifier, ...(ttlMs ? { ttlMs } : {}) });
+  const gate = new Gate(db, queue, { policy, notifier, ttlByType, ...(ttlMs ? { ttlMs } : {}) });
 
   const handlers = {
     'reply.draft': makeDraftHandler({ db, queue, model }),
@@ -45,6 +46,10 @@ function createSteward({
       void crm.upsertContact({ key: payload.key || `crm:${job.id}`, ...payload }),
     'invoice.create': async (payload, job) =>
       void invoicing.create({ key: payload.key || `invoice:${job.id}`, ...payload }),
+    // Used by the "something that keeps failing" scenario: a handler that
+    // always throws, to show retry and the terminal failed state.
+    flaky: async () => { throw new Error('the upstream system said no'); },
+    'contract.sign': async (payload) => ({ signed: payload.counterparty }),
     'payment.send': async (payload) => {
       if (!Number.isFinite(Number(payload.amount))) throw new Error('payment without an amount');
       // A stand-in for a bank. The point of the project is that nothing
