@@ -89,7 +89,15 @@ export function App() {
           <h1 className="text-xl font-bold tracking-tight text-slate-50">
             Steward<span className="text-good">.</span>
           </h1>
-          <p className="text-xs text-slate-500">autonomous operations, with a human approval gate</p>
+          <p className="text-xs text-slate-500">
+            autonomous operations, with a human approval gate
+            <a
+              className="ml-2 text-slate-600 hover:text-slate-400 font-mono"
+              href="https://github.com/charlie-hk"
+            >
+              A.Amini
+            </a>
+          </p>
           <div className="ml-auto flex items-center gap-3">
             <label className="label" htmlFor="reviewer">reviewing as</label>
             <input
