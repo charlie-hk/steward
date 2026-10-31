@@ -60,6 +60,26 @@ class Queue {
     }
   }
 
+  // Parked until a person decides. Not claimable while it sits here, and no
+  // attempt is consumed: waiting for approval is not a failure.
+  hold(id) {
+    this.db.prepare(`UPDATE jobs SET status='awaiting_approval', lease_until=NULL, updated_at=? WHERE id=?`)
+      .run(now(), id);
+  }
+
+  // Back in the queue, due immediately.
+  release(id) {
+    this.db.prepare(`UPDATE jobs SET status='pending', next_run_at=?, lease_until=NULL, updated_at=? WHERE id=?`)
+      .run(now(), now(), id);
+  }
+
+  // Terminal, and deliberately not 'failed': the job did not break, it was not
+  // allowed to run. Retrying it would be wrong, so no attempt is consumed.
+  halt(id, status, reason) {
+    this.db.prepare(`UPDATE jobs SET status=?, last_error=?, lease_until=NULL, updated_at=? WHERE id=?`)
+      .run(status, reason, now(), id);
+  }
+
   // A worker that died left jobs stuck in 'in_progress'. Any whose lease has
   // expired are returned to the queue so another worker can pick them up.
   recoverExpiredLeases() {

@@ -34,16 +34,82 @@ Built and tested:
   `max_attempts`.
 - Lease-based crash recovery: a job whose worker died is returned to the queue
   once its lease expires, and reruns without repeating its side effect.
-- An append-only audit log of every state change.
+- A human approval gate for consequential actions, described below.
+- An append-only audit log of every state change and every human decision.
 - A mock connector (email) that is idempotent at the data layer, mirroring how
   real providers (Stripe, SendGrid) use an idempotency key.
+- A review CLI: see what is waiting, approve it, reject it, read the log.
 
 Planned, built in stages:
 
-- A human approval gate for consequential actions.
-- An approval dashboard (pending / approved / rejected / failed / completed).
+- An approval dashboard over HTTP, on top of the gate that now exists.
 - More mock connectors (CRM, invoicing).
 - The AI layer described below.
+
+## The approval gate
+
+A rule decides whether an action is consequential. The worker asks the gate
+about every job it claims, **before** the handler runs, so nothing has happened
+yet when a person is asked about it. The gate answers with one of three things:
+run it, hold it, or stop.
+
+```
+                   +-- no rule matched ------------------> run the handler
+claim a job -----> |
+                   +-- a rule matched --> awaiting_approval
+                                                |
+                                   approve ---> back in the queue, runs once
+                                   reject  ---> rejected, the handler never runs
+                                   nobody  ---> expired, the handler never runs
+```
+
+The rules are plain functions, so a deployment supplies its own without
+touching the engine (`src/policy.js`). The defaults hold anything that moves
+money or signs something, any payload over a limit, and any email leaving the
+organisation:
+
+```js
+const { makePolicy, alwaysHold, amountOver } = require('./src/policy');
+
+const policy = makePolicy([
+  alwaysHold(['payment.send', 'contract.sign']),
+  amountOver(500),
+]);
+```
+
+Four details matter more than the feature itself, and each has a test:
+
+- **One request per job.** `approvals.job_id` is UNIQUE. A job that is claimed,
+  held, and claimed again does not open a second request, so a restart loop
+  cannot turn into a flood of notifications.
+- **One decision, ever.** The decision is an UPDATE conditional on the row
+  still being pending, inside the same transaction that releases the job. Two
+  reviewers pressing Approve at the same moment produce one decision and one
+  run; pressing it twice changes nothing.
+- **The decision outranks the rule.** The policy is consulted once, the first
+  time a job reaches the gate, and the answer is written down. Changing the
+  rules afterwards does not re-open a job a person has already approved.
+- **Silence is not consent.** An approval nobody answers expires, and the job
+  stops. Waiting also consumes no retry attempt: a job held for review has not
+  failed, and must not burn its budget while it waits.
+
+Watch it happen:
+
+```bash
+npm run demo:gate
+```
+
+Four jobs go in. Two run unattended, two wait. A refund email to an outside
+address is approved and sends exactly once; a USD 4,820 payment is rejected and
+never runs. The audit log at the end says who decided what, and when.
+
+Then take the human side yourself:
+
+```bash
+node scripts/review.js list   --db data/gate-demo.db
+node scripts/review.js approve 1 --by ali --note "invoice checked" --db data/gate-demo.db
+node scripts/review.js audit  --db data/gate-demo.db
+```
 
 ## The AI layer
 
@@ -101,24 +167,30 @@ It works because of two things together:
 
 ```bash
 npm install
-npm test        # 4 passing
-npm run demo    # a small end-to-end run you can watch
+npm test          # 12 passing
+npm run demo      # the durable queue, end to end
+npm run demo:gate # the approval gate, end to end
 ```
 
 ## Layout
 
 ```
 src/
-  db.js               schema: jobs, audit_log, connector output
-  queue.js            enqueue, claim, complete, fail, retry, recovery
-  worker.js           the processing loop and crash recovery
+  db.js               schema: jobs, approvals, audit_log, connector output
+  queue.js            enqueue, claim, complete, fail, retry, hold, release, recovery
+  worker.js           the processing loop, crash recovery, the gate check
+  gate.js             approval requests, decisions, expiry
+  policy.js           the rules that decide what needs a person
   audit.js            append-only audit log
   connectors/
     email.js          idempotent mock connector
 test/
   queue.test.js       idempotent enqueue, retry, and the crash test
+  approvals.test.js   held, approved, rejected, expired, and decided twice
 scripts/
-  demo.js             end-to-end example
+  demo.js             the queue, end to end
+  demo-gate.js        the approval gate, end to end
+  review.js           the reviewer's CLI
 ```
 
 ## Related work

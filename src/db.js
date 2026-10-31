@@ -28,6 +28,23 @@ function migrate(db) {
 
     CREATE INDEX IF NOT EXISTS idx_jobs_claimable ON jobs (status, next_run_at);
 
+    -- One approval per job, enforced by the UNIQUE job_id. That constraint is
+    -- what makes "ask a human" idempotent: a job that is claimed, held and
+    -- claimed again does not open a second request for the same action.
+    CREATE TABLE IF NOT EXISTS approvals (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id       INTEGER NOT NULL UNIQUE REFERENCES jobs(id),
+      reason       TEXT    NOT NULL,
+      status       TEXT    NOT NULL DEFAULT 'pending',
+      requested_at INTEGER NOT NULL,
+      expires_at   INTEGER NOT NULL,
+      decided_at   INTEGER,
+      decided_by   TEXT,
+      note         TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_approvals_open ON approvals (status, expires_at);
+
     CREATE TABLE IF NOT EXISTS audit_log (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       event      TEXT    NOT NULL,

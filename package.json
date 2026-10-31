@@ -9,7 +9,9 @@
   },
   "scripts": {
     "test": "node --test",
-    "demo": "node scripts/demo.js"
+    "demo": "node scripts/demo.js",
+    "demo:gate": "node scripts/demo-gate.js",
+    "review": "node scripts/review.js"
   },
   "keywords": [
     "job-queue",
@@ -19,7 +21,9 @@
     "reliability",
     "sqlite",
     "human-in-the-loop",
-    "nodejs"
+    "nodejs",
+    "approval-gate",
+    "audit-log"
   ],
   "author": "Ali Amini",
   "license": "MIT",
