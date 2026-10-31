@@ -55,14 +55,65 @@ function migrate(db) {
 
     -- Mock connector output. The UNIQUE key is what makes a side effect
     -- safe to retry: a second attempt with the same key changes nothing.
+    CREATE TABLE IF NOT EXISTS crm_contacts (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      idem_key   TEXT    NOT NULL UNIQUE,
+      email      TEXT    NOT NULL,
+      name       TEXT,
+      company    TEXT,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS invoices (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      idem_key     TEXT    NOT NULL UNIQUE,
+      customer     TEXT    NOT NULL,
+      amount_cents INTEGER NOT NULL,
+      currency     TEXT    NOT NULL DEFAULT 'USD',
+      created_at   INTEGER NOT NULL
+    );
+
+    -- The corpus the drafting step retrieves from: past replies, account
+    -- notes, policy documents. Plain rows, searched in JavaScript.
+    CREATE TABLE IF NOT EXISTS documents (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind       TEXT    NOT NULL,
+      subject    TEXT    NOT NULL,
+      body       TEXT    NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+
+    -- What the model wrote, and what it was shown when it wrote it. A draft
+    -- belongs to the job that will send it, so the approval, the draft and the
+    -- decision are one chain in the log.
+    CREATE TABLE IF NOT EXISTS drafts (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id     INTEGER UNIQUE REFERENCES jobs(id),
+      topic      TEXT    NOT NULL,
+      prompt     TEXT    NOT NULL,
+      body       TEXT    NOT NULL,
+      model      TEXT    NOT NULL,
+      sources    TEXT    NOT NULL DEFAULT '[]',
+      created_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS sent_emails (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       idem_key   TEXT    NOT NULL UNIQUE,
       recipient  TEXT    NOT NULL,
       subject    TEXT,
+      body       TEXT,
+      kind       TEXT    NOT NULL DEFAULT 'mail',
       created_at INTEGER NOT NULL
     );
   `);
+
+  // CREATE TABLE IF NOT EXISTS does nothing to a table that already exists, so
+  // a column added later needs its own step. Cheap, and it keeps an old
+  // database file working instead of asking someone to delete it.
+  const columns = db.prepare('PRAGMA table_info(sent_emails)').all().map((c) => c.name);
+  if (!columns.includes('body')) db.exec('ALTER TABLE sent_emails ADD COLUMN body TEXT');
+  if (!columns.includes('kind')) db.exec("ALTER TABLE sent_emails ADD COLUMN kind TEXT NOT NULL DEFAULT 'mail'");
 }
 
 module.exports = { openDb };

@@ -25,7 +25,9 @@ const recipientOutside = (domains) => (job, payload) => {
 };
 
 const defaultRules = [
-  alwaysHold(['payment.send', 'contract.sign', 'account.close']),
+  // Anything a model wrote is in this list on principle: it proposes, a
+  // person decides. 'reply.send' is the draft handler's output.
+  alwaysHold(['payment.send', 'contract.sign', 'account.close', 'reply.send']),
   amountOver(500),
   recipientOutside(['example.com']),
 ];

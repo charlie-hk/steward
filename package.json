@@ -1,9 +1,9 @@
 {
   "name": "steward",
   "version": "0.1.0",
-  "description": "An autonomous operations engine with a human approval gate. Runs unattended, survives restarts, and never performs a consequential action twice.",
+  "description": "An autonomous operations engine with a human approval gate: durable queue, idempotency, crash recovery, an audit log, a review dashboard, and a model that proposes but never acts.",
   "type": "commonjs",
-  "main": "src/index.js",
+  "main": "src/steward.js",
   "engines": {
     "node": ">=18.0.0"
   },
@@ -11,7 +11,12 @@
     "test": "node --test",
     "demo": "node scripts/demo.js",
     "demo:gate": "node scripts/demo-gate.js",
-    "review": "node scripts/review.js"
+    "review": "node scripts/review.js",
+    "start": "node src/cli.js serve",
+    "work": "node src/cli.js work",
+    "demo:ai": "node scripts/demo-ai.js",
+    "export:training": "node scripts/export-training.js",
+    "figures": "node scripts/figures.js"
   },
   "keywords": [
     "job-queue",
@@ -23,11 +28,18 @@
     "human-in-the-loop",
     "nodejs",
     "approval-gate",
-    "audit-log"
+    "audit-log",
+    "express",
+    "dashboard",
+    "ai-agent",
+    "llm",
+    "retrieval",
+    "approval-workflow"
   ],
   "author": "Ali Amini",
   "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^11.0.0"
+    "better-sqlite3": "^11.0.0",
+    "express": "^4.22.3"
   }
 }

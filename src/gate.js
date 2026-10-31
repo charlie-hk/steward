@@ -1,5 +1,6 @@
 const { audit } = require('./audit');
 const { makePolicy } = require('./policy');
+const { silent } = require('./notify');
 
 const now = () => Date.now();
 const DAY = 24 * 60 * 60 * 1000;
@@ -18,11 +19,12 @@ const DAY = 24 * 60 * 60 * 1000;
 // person has already approved, which is the behaviour anyone reviewing an
 // audit log expects.
 class Gate {
-  constructor(db, queue, { policy = makePolicy(), ttlMs = DAY } = {}) {
+  constructor(db, queue, { policy = makePolicy(), ttlMs = DAY, notifier = silent() } = {}) {
     this.db = db;
     this.queue = queue;
     this.policy = policy;
     this.ttlMs = ttlMs;
+    this.notifier = notifier;
   }
 
   check(job, payload = {}) {
@@ -44,8 +46,19 @@ class Gate {
       INSERT OR IGNORE INTO approvals (job_id, reason, status, requested_at, expires_at)
       VALUES (?, ?, 'pending', ?, ?)
     `).run(job.id, reason, t, t + this.ttlMs);
-    if (info.changes === 1) audit(this.db, 'approval.requested', job.id, { type: job.type, reason });
-    return this.findByJob(job.id);
+    const approval = this.findByJob(job.id);
+    // Only on the row that was actually created. A job claimed, held and
+    // claimed again must not alert anyone a second time, and a notifier that
+    // throws must not fail the job.
+    if (info.changes === 1) {
+      audit(this.db, 'approval.requested', job.id, { type: job.type, reason });
+      try {
+        this.notifier.notify({ approval, job, reason });
+      } catch (err) {
+        audit(this.db, 'notify.failed', job.id, { error: err.message });
+      }
+    }
+    return approval;
   }
 
   get(id) {
